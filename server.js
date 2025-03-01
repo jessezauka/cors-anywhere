@@ -20,7 +20,7 @@ function parseEnvList(env) {
 var checkRateLimit = require('./lib/rate-limit')(process.env.CORSANYWHERE_RATELIMIT);
 
 var cors_proxy = require('./lib/cors-anywhere');
-var server = cors_proxy.createServer({
+cors_proxy.createServer({
   originWhitelist: [],
   requireHeader: [],
   removeHeaders: [
@@ -36,19 +36,7 @@ var server = cors_proxy.createServer({
   httpProxyOptions: {
     // Do not add X-Forwarded-For, etc. headers, because Heroku already adds it.
     xfwd: false,
-    // Enable streaming
-    buffer: false, // Disable buffering to stream data in chunks
   },
-});
-
-// Handle client disconnections gracefully
-server.on('proxyReq', function (proxyReq, req, res, options) {
-  req.on('close', () => {
-    proxyReq.destroy(); // Stop the upstream request if the client disconnects
-    console.log('Client disconnected');
-  });
-});
-
-server.listen(port, host, function () {
+}).listen(port, host, function() {
   console.log('Running CORS Anywhere on ' + host + ':' + port);
 });
