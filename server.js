@@ -20,8 +20,8 @@ function parseEnvList(env) {
 var checkRateLimit = require('./lib/rate-limit')(process.env.CORSANYWHERE_RATELIMIT);
 
 var cors_proxy = require('./lib/cors-anywhere');
-cors_proxy.createServer({
-  originWhitelist: [],
+var server = cors_proxy.createServer({
+  originWhitelist: originWhitelist,
   requireHeader: [],
   removeHeaders: [
     'cookie',
@@ -37,6 +37,37 @@ cors_proxy.createServer({
     // Do not add X-Forwarded-For, etc. headers, because Heroku already adds it.
     xfwd: false,
   },
-}).listen(port, host, function() {
+});
+
+// Override the request handler to fix the double slash issue
+server.on('request', function(req, res) {
+  try {
+    console.log('Incoming request:', req.url);
+
+    // Extract the target URL from the request
+    const targetUrl = req.url.slice(1); // Remove the leading slash
+
+    // Ensure the target URL starts with http:// or https://
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      throw new Error('The URL is invalid: it must start with http:// or https://');
+    }
+
+    // Ensure the double slash after http: or https: is preserved
+    const fixedUrl = targetUrl.replace(/^http:\/([^/])/, 'http://$1')
+                              .replace(/^https:\/([^/])/, 'https://$1');
+
+    // Update the request URL with the fixed URL
+    req.url = '/' + fixedUrl;
+
+    // Proceed with the proxy logic
+    cors_proxy.emit('request', req, res);
+  } catch (err) {
+    console.error('Error:', err.message);
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    res.end(err.message);
+  }
+});
+
+server.listen(port, host, function() {
   console.log('Running CORS Anywhere on ' + host + ':' + port);
 });
